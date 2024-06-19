@@ -1,0 +1,198 @@
+#include <bits/stdc++.h>
+#include <stdio.h>
+#include <windows.h>
+using namespace std;
+
+wstring tetromino[7];
+int width = 12, scrw = 80;
+int height = 18, scrh = 30;
+unsigned char *pfield = nullptr;
+
+int rotiraj(int x, int y, int r){
+    switch(r % 4){
+    case 0: return y * 4 + x; // za 0*
+    case 1: return 12 + y - (x * 4); // za 90*
+    case 2: return 15 - (y * 4) - x; // za 180*
+    case 3: return 3 - y + (x * 4); //270*
+    }
+    return 0;
+}
+
+bool dpf(int tetroi, int rotac, int posx, int posy){
+    for(int i = 0; i < 4; i++){
+        for(int j = 0; j < 4; j++){
+            int pi = rotiraj(i, j, rotac);
+            int fi =(posy + j) * width + (posx + i);
+            if(posx + i >= 0 && posx + i < width){
+                if(posy + j >= 0 && posy + j < height){
+                    if(tetromino[tetroi][pi] == L'X' && pfield[fi] != 0){
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+    return true;
+}
+int main(){
+    tetromino[0].append(L"..X.");
+    tetromino[0].append(L"..X.");
+    tetromino[0].append(L"..X.");
+    tetromino[0].append(L"..X.");
+
+    tetromino[1].append(L"..X.");
+    tetromino[1].append(L".XX.");
+    tetromino[1].append(L".X..");
+    tetromino[1].append(L"....");
+
+    tetromino[2].append(L".X..");
+    tetromino[2].append(L".XX.");
+    tetromino[2].append(L"..X.");
+    tetromino[2].append(L"....");
+
+    tetromino[3].append(L"....");
+    tetromino[3].append(L".XX.");
+    tetromino[3].append(L".XX.");
+    tetromino[3].append(L"....");
+
+    tetromino[4].append(L"..X.");
+    tetromino[4].append(L".XX.");
+    tetromino[4].append(L"..X.");
+    tetromino[4].append(L"....");
+
+    tetromino[5].append(L"....");
+    tetromino[5].append(L".XX.");
+    tetromino[5].append(L"..X.");
+    tetromino[5].append(L"..X.");
+
+    tetromino[6].append(L"....");
+    tetromino[6].append(L".XX.");
+    tetromino[6].append(L".X..");
+    tetromino[6].append(L".X..");
+
+    pfield = new unsigned char[width * height];
+    for(int i = 0; i < width; i++){
+        for(int j = 0; j < height; j++){
+            pfield[j*width + i] = (i == 0 || i == width - 1 || j == height - 1) ? 9 : 0;
+        }
+    }
+
+    wchar_t *screen = new wchar_t[scrw*scrh];
+    for(int i = 0; i < scrw*scrh; i++){
+        screen[i] = L' ';
+    }
+    HANDLE hConsole = CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
+	SetConsoleActiveScreenBuffer(hConsole);
+	DWORD dwBytesWritten = 0;
+
+    bool GameOver = false;
+    bool bKey[4];
+    bool rtlatch = false;
+    vector<int> vek_linije;
+    int curtetro = 0, currotat = 0, curx = width/2, cury = 0, speed = 20, speedbr = 0;
+    bool padni = false;
+    int nk = 0;
+    int skour = 0;
+
+    while(GameOver == false){
+        this_thread::sleep_for(50ms);
+        speedbr++;
+        padni = (speedbr == speed);
+        for(int k = 0; k < 4; k++)								// R   L   D Z
+			bKey[k] = (0x8000 & GetAsyncKeyState((unsigned char)("\x27\x25\x28\x26"[k]))) != 0;
+		//user input
+        if(bKey[1]){
+            if(dpf(curtetro, currotat, curx - 1, cury)){
+                curx -= 1;
+            }
+        }
+        if(bKey[0]){
+            if(dpf(curtetro, currotat, curx + 1, cury)){
+                curx += 1;
+            }
+        }
+        if(bKey[2]){
+            if(dpf(curtetro, currotat, curx, cury + 1)){
+                cury += 1;
+            }
+        }
+        if(bKey[3]){
+            currotat += (!rtlatch && dpf(curtetro, currotat + 1, curx, cury)) ? 9 : 0;
+            rtlatch = true;
+        }else{
+            rtlatch = false;
+        }
+        if(padni){
+            if(dpf(curtetro, currotat, curx, cury + 1)){
+                cury++;
+            }else{
+                for(int i = 0; i < 4; i++){
+                    for(int j = 0; j < 4; j++){
+                        if(tetromino[curtetro][rotiraj(i, j, currotat)] == L'X'){
+                            pfield[(cury + j) * width + (curx + i)] = curtetro + 1;
+                        }
+                    }
+                }
+                nk++;
+                if(nk % 10 == 0){
+                    if(speed >= 10){
+                        speed--;
+                    }
+                }
+                for(int i = 0; i < 4; i++){
+                    if(cury + i < height - 1){
+                        bool linija = true;
+                        for(int j = 1; j < width - 1; j++){
+                            linija &= (pfield[(cury + i)*width+j])!= 0;
+                        }
+                        if(linija){
+                            for(int i2 = 1; i2 < width - 1; i2++){
+                                pfield[(cury + i) * width + i2] = 8;
+                            }
+                            vek_linije.push_back(cury + i);
+                        }
+                    }
+                }
+                skour += 25;
+                curx = width/2;
+                cury = 0;
+                currotat = 0;
+                curtetro = rand() % 7;
+                GameOver = !dpf(curtetro, currotat, curx, cury);
+            }
+            speedbr = 0;
+        }
+        for(int i = 0; i < width; i++){
+            for(int j = 0; j < height; j++){
+                screen[(j+2)*scrw+(i+2)] = L" ABCDEFG=#"[pfield[j*width+i]];
+            }
+        }
+        for(int i = 0; i < 4; i++){
+            for(int j = 0; j < 4; j++){
+                if(tetromino[curtetro][rotiraj(i, j, currotat)] == L'X'){
+                    screen[(cury + j + 2) * scrw + (curx + i + 2)] = curtetro + 65;
+                }
+            }
+        }
+        swprintf_s(&screen[2 * width + width + 6], 16, L"skour: %8d", skour);
+        if(!vek_linije.empty()){
+            WriteConsoleOutputCharacterW(hConsole, screen, scrw*scrh, {0, 0}, &dwBytesWritten);
+            this_thread::sleep_for(400ms);
+
+            for(auto &v : vek_linije){
+                for(int i = 1; i < width - 1; i++){
+                    for(int j = v; j > 0; j--){
+                            pfield[j * width + i] = pfield[(j - 1) * width + i];
+                        pfield[i] = 0;
+                    }
+                }
+            }
+            vek_linije.clear();
+        }
+        WriteConsoleOutputCharacterW(hConsole, screen, scrw*scrh, {0, 0}, &dwBytesWritten);
+    }
+    CloseHandle(hConsole);
+    cout << "UTEPA LI SE BATE?? gle kvo napravi: " << skour << endl;
+    system("pause");
+    return 0;
+}
